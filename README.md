@@ -30,3 +30,47 @@ Generated from the trained baseline Logistic Regression model on the full credit
 
 
 
+\## 🖥️ Streamlit Dashboard — Proof
+
+
+
+The Streamlit dashboard provides an interactive interface for exploring model performance, score distributions, and operational threshold trade-offs in a fraud detection setting.
+
+
+
+
+
+\### Dashboard Overview
+
+!\[Dashboard Overview](reports/figures/screenshots/dashboard\_overview.png)
+
+
+
+\### Model Performance
+
+!\[Model Performance](reports/figures/screenshots/model\_performance.png)
+
+
+
+\### Threshold Tuning
+
+!\[Threshold Tuning](reports/figures/screenshots/threshold\_tuning.png)
+
+
+
+\### Dataset Overview
+
+!\[Dataset Overview](reports/figures/screenshots/dataset\_overview.png)
+
+
+
+\### Supporting Visual Diagnostics
+
+
+
+!\[Threshold Sweep Curve](reports/figures/screenshots/threshold\_sweep\_curve.png)
+
+
+
+!\[Score Distribution](reports/figures/screenshots/score\_distribution.png)
+
