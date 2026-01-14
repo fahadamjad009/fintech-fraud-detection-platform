@@ -5,3 +5,4 @@ pyarrow>=14.0
 openml>=0.14
 pydantic>=2.0
 python-dotenv>=1.0
+joblib>=1.3
