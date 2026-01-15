@@ -10,3 +10,4 @@ plotly>=5.0
 kaleido>=0.2
 streamlit>=1.30
 xgboost>=2.0
+matplotlib>=3.8
