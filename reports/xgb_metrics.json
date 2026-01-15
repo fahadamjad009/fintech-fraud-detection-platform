@@ -1,0 +1,22 @@
+{
+  "model": "xgboost",
+  "features_path": "D:\\projects\\fintech-fraud-detection-platform\\data\\features\\creditcard_features.parquet",
+  "test_size": 0.2,
+  "random_state": 42,
+  "scale_pos_weight": 577.2868020304569,
+  "pr_auc": 0.8632345846672462,
+  "roc_auc": 0.9864424103912809,
+  "confusion_matrix_threshold_0_5": [
+    [
+      56824,
+      40
+    ],
+    [
+      14,
+      84
+    ]
+  ],
+  "threshold": 0.5,
+  "n_test": 56962,
+  "positives_test": 98
+}
