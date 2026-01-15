@@ -9,7 +9,9 @@ import streamlit as st
 st.set_page_config(page_title="FinTech Fraud Detection Platform", layout="wide")
 
 st.title("FinTech Fraud Detection Platform — Baseline Model Monitor")
-st.caption("Interactive monitoring dashboard: dataset profile, baseline metrics, PR/ROC, threshold tuning artifacts.")
+st.caption(
+    "Interactive monitoring dashboard: dataset profile, baseline metrics, PR/ROC, threshold tuning artifacts, and model comparison."
+)
 
 REPORTS = Path("reports")
 FIGS = REPORTS / "figures"
@@ -17,6 +19,9 @@ INTERACTIVE = REPORTS / "interactive"
 
 METRICS_JSON = REPORTS / "baseline_metrics.json"
 SWEEP_JSON = REPORTS / "baseline_threshold_sweep.json"
+XGB_METRICS_JSON = REPORTS / "xgb_metrics.json"
+COMPARE_PNG = FIGS / "model_comparison_auc.png"
+
 DATA_PARQUET = Path("data/processed/creditcard.parquet")
 
 
@@ -28,36 +33,44 @@ def load_json(p: Path):
 
 metrics = load_json(METRICS_JSON)
 sweep = load_json(SWEEP_JSON)
+xgb_metrics = load_json(XGB_METRICS_JSON)
 
 # --- Sidebar ---
 st.sidebar.header("Controls")
 show_data_sample = st.sidebar.checkbox("Show data sample", value=False)
 show_interactive_html = st.sidebar.checkbox("Show interactive HTML embeds", value=True)
 
-# --- KPIs ---
+# --- KPIs (LogReg baseline) ---
 c1, c2, c3, c4 = st.columns(4)
 
 if metrics:
-    c1.metric("PR-AUC", f"{metrics['pr_auc']:.4f}")
-    c2.metric("ROC-AUC", f"{metrics['roc_auc']:.4f}")
+    c1.metric("PR-AUC (LogReg)", f"{metrics['pr_auc']:.4f}")
+    c2.metric("ROC-AUC (LogReg)", f"{metrics['roc_auc']:.4f}")
     cm = metrics["confusion_matrix"]
     tn, fp = cm[0]
     fn, tp = cm[1]
-    c3.metric("Fraud Recall @0.5", f"{tp/(tp+fn):.3f}" if (tp+fn) else "n/a")
-    c4.metric("Fraud Precision @0.5", f"{tp/(tp+fp):.3f}" if (tp+fp) else "n/a")
+    c3.metric("Fraud Recall @0.5", f"{tp/(tp+fn):.3f}" if (tp + fn) else "n/a")
+    c4.metric("Fraud Precision @0.5", f"{tp/(tp+fp):.3f}" if (tp + fp) else "n/a")
 else:
-    c1.info("Run training to populate metrics.")
-    c2.info("Run training to populate metrics.")
-    c3.info("Run training to populate metrics.")
-    c4.info("Run training to populate metrics.")
+    c1.info("Run baseline training to populate metrics.")
+    c2.info("Run baseline training to populate metrics.")
+    c3.info("Run baseline training to populate metrics.")
+    c4.info("Run baseline training to populate metrics.")
 
 st.divider()
 
 # --- Tabs ---
-tab1, tab2, tab3 = st.tabs(["📊 Model Performance", "🎚️ Threshold Tuning", "🧾 Dataset Overview"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    [
+        "📊 Model Performance",
+        "🎚️ Threshold Tuning",
+        "🧾 Dataset Overview",
+        "🧪 Model Comparison",
+    ]
+)
 
 with tab1:
-    st.subheader("Model Performance")
+    st.subheader("Model Performance (Logistic Regression Baseline)")
     left, right = st.columns(2)
 
     pr_png = FIGS / "baseline_pr_curve.png"
@@ -66,8 +79,13 @@ with tab1:
 
     if pr_png.exists():
         left.image(str(pr_png), caption="Precision-Recall Curve", use_container_width=True)
+    else:
+        left.info("Missing: reports/figures/baseline_pr_curve.png")
+
     if roc_png.exists():
         right.image(str(roc_png), caption="ROC Curve", use_container_width=True)
+    else:
+        right.info("Missing: reports/figures/baseline_roc_curve.png")
 
     if score_png.exists():
         st.image(str(score_png), caption="Score Distribution by Class", use_container_width=True)
@@ -80,10 +98,12 @@ with tab1:
                 st.components.v1.html(html_path.read_text(), height=520, scrolling=True)
 
 with tab2:
-    st.subheader("Threshold Tuning")
+    st.subheader("Threshold Tuning (Logistic Regression)")
     sweep_png = FIGS / "baseline_threshold_sweep.png"
     if sweep_png.exists():
         st.image(str(sweep_png), caption="Precision/Recall vs Threshold", use_container_width=True)
+    else:
+        st.info("Missing: reports/figures/baseline_threshold_sweep.png")
 
     if sweep and "sweep" in sweep:
         df_sweep = pd.DataFrame(sweep["sweep"])
@@ -102,7 +122,7 @@ with tab2:
         else:
             st.warning("No thresholds meet this precision target.")
     else:
-        st.info("Run plot generation to create threshold sweep JSON.")
+        st.info("Run plot generation to create threshold sweep JSON: reports/baseline_threshold_sweep.json")
 
     if show_interactive_html:
         html_path = INTERACTIVE / "baseline_threshold_sweep.html"
@@ -123,3 +143,34 @@ with tab3:
             st.dataframe(df.sample(25, random_state=42), use_container_width=True)
     else:
         st.info("Processed parquet not found. Run CSV→Parquet conversion.")
+
+with tab4:
+    st.subheader("Model Comparison — Logistic Regression vs XGBoost")
+
+    rows = []
+    if metrics:
+        rows.append(
+            {
+                "Model": "Logistic Regression",
+                "PR-AUC": metrics.get("pr_auc"),
+                "ROC-AUC": metrics.get("roc_auc"),
+            }
+        )
+    if xgb_metrics:
+        rows.append(
+            {
+                "Model": "XGBoost",
+                "PR-AUC": xgb_metrics.get("pr_auc"),
+                "ROC-AUC": xgb_metrics.get("roc_auc"),
+            }
+        )
+
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    else:
+        st.info("No comparison metrics found yet. Run XGBoost training to generate reports/xgb_metrics.json.")
+
+    if COMPARE_PNG.exists():
+        st.image(str(COMPARE_PNG), caption="AUC Comparison Plot", use_container_width=True)
+    else:
+        st.warning("Comparison plot not found: reports/figures/model_comparison_auc.png")
