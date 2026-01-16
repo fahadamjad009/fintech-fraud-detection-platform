@@ -20,5 +20,5 @@ __pycache__/
 .vscode/
 .idea/
 # --- Artifacts (generated outputs) ---
-models/
+/models/
 reports/interactive/
