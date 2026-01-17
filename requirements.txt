@@ -11,3 +11,5 @@ kaleido>=0.2
 streamlit>=1.30
 xgboost>=2.0
 matplotlib>=3.8
+fastapi>=0.110
+uvicorn[standard]>=0.27
