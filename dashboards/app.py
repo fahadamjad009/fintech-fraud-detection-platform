@@ -15,6 +15,9 @@ st.caption(
 
 REPORTS = Path("reports")
 FIGS = REPORTS / "figures"
+COST_JSON = REPORTS / "cost_threshold_optimum.json"
+COST_PNG = FIGS / "cost_curve_by_threshold.png"
+
 INTERACTIVE = REPORTS / "interactive"
 
 METRICS_JSON = REPORTS / "baseline_metrics.json"
@@ -60,14 +63,16 @@ else:
 st.divider()
 
 # --- Tabs ---
-tab1, tab2, tab3, tab4 = st.tabs(
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
     [
         "📊 Model Performance",
         "🎚️ Threshold Tuning",
         "🧾 Dataset Overview",
         "🧪 Model Comparison",
+        "💸 Cost Optimisation",
     ]
 )
+
 
 with tab1:
     st.subheader("Model Performance (Logistic Regression Baseline)")
@@ -174,3 +179,53 @@ with tab4:
         st.image(str(COMPARE_PNG), caption="AUC Comparison Plot", use_container_width=True)
     else:
         st.warning("Comparison plot not found: reports/figures/model_comparison_auc.png")
+
+with tab5:
+    st.subheader("💸 Cost-Based Threshold Optimisation")
+
+    if COST_JSON.exists():
+        cost_data = json.loads(COST_JSON.read_text())
+
+        best_threshold = cost_data["best_threshold"]
+        expected_cost = cost_data["best_expected_cost"]
+
+        metrics_best = cost_data["metrics_at_best"]
+        precision = metrics_best["precision"]
+        recall = metrics_best["recall"]
+        tp = metrics_best["tp"]
+        fp = metrics_best["fp"]
+        fn = metrics_best["fn"]
+
+        st.markdown("### Optimal Decision Threshold")
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Optimal Threshold", f"{best_threshold:.2f}")
+        c2.metric("Expected Cost ($)", f"{expected_cost:,.0f}")
+        c3.metric("Recall @ Optimum", f"{recall:.3f}")
+
+        st.markdown(
+            f"""
+**Decision context**
+
+- False Negative cost: **${cost_data['cost_config']['cost_fn']:,.0f}**
+- False Positive cost: **${cost_data['cost_config']['cost_fp']:,.0f}**
+
+At this threshold:
+- Precision = **{precision:.3f}**
+- Recall = **{recall:.3f}**
+- TP / FP / FN = **{tp} / {fp} / {fn}**
+
+This threshold minimises **total expected financial loss**, not just ML metrics.
+"""
+        )
+
+    else:
+        st.warning("Cost optimisation JSON not found. Run cost_threshold_optimiser.py")
+
+    st.divider()
+
+    if COST_PNG.exists():
+        st.markdown("### Expected Cost vs Threshold")
+        st.image(str(COST_PNG), use_container_width=True)
+    else:
+        st.info("Cost curve plot not found.")
