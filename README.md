@@ -10,6 +10,10 @@ Offline evaluation • Model comparison • Cost-based decisioning • Streamlit
 This project demonstrates a **production-minded fraud detection pipeline** built using real-world FinTech practices.  
 It focuses on **highly imbalanced transaction data**, operational decision-making, and **business-driven evaluation**.
 
+##  Architecture
+
+See full architecture + flow diagram here: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
+
 The system covers the **full ML lifecycle**:
 
 - Offline model training & evaluation
