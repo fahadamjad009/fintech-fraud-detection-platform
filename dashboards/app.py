@@ -6,6 +6,9 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+DRIFT_CSV = Path("monitoring/reports/data_drift_report.csv")
+
+
 st.set_page_config(page_title="FinTech Fraud Detection Platform", layout="wide")
 
 st.title("FinTech Fraud Detection Platform — Baseline Model Monitor")
@@ -63,13 +66,14 @@ else:
 st.divider()
 
 # --- Tabs ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     [
         "📊 Model Performance",
         "🎚️ Threshold Tuning",
         "🧾 Dataset Overview",
         "🧪 Model Comparison",
         "💸 Cost Optimisation",
+        "📡 Monitoring / Drift",
     ]
 )
 
@@ -229,3 +233,27 @@ This threshold minimises **total expected financial loss**, not just ML metrics.
         st.image(str(COST_PNG), use_container_width=True)
     else:
         st.info("Cost curve plot not found.")
+
+with tab6:
+    st.subheader("📡 Monitoring / Drift Detection")
+
+    st.markdown(
+        "This section simulates **production monitoring** by comparing a reference distribution "
+        "to a current (simulated) distribution and flagging drift using **KS p-value** and **PSI**."
+    )
+
+    if DRIFT_CSV.exists():
+        df_drift = pd.read_csv(DRIFT_CSV)
+        st.dataframe(df_drift, use_container_width=True, height=420)
+
+        drifted = df_drift[df_drift["drift_flag"] == True]  # noqa: E712
+        c1, c2 = st.columns(2)
+        c1.metric("Features flagged", int(len(drifted)))
+        c2.metric("Total monitored", int(len(df_drift)))
+
+        if len(drifted) > 0:
+            st.warning("Drift detected in some features (simulated). Review flagged rows.")
+        else:
+            st.success("No drift flags detected.")
+    else:
+        st.info("Run drift detection first: `python monitoring/detect_drift.py`")
