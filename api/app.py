@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -10,12 +12,17 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-
 # -----------------------------
 # Config
 # -----------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_PATH = PROJECT_ROOT / "models" / "baseline_logreg.joblib"
+
+# Monitoring / request logging (kept outside git via .gitignore)
+MONITORING_DATA = PROJECT_ROOT / "monitoring" / "data"
+MONITORING_DATA.mkdir(parents=True, exist_ok=True)
+REQUEST_LOG_PARQUET = MONITORING_DATA / "api_requests.parquet"
+REQUEST_LOG_CSV = MONITORING_DATA / "api_requests.csv"
 
 app = FastAPI(
     title="FinTech Fraud Detection Platform API",
@@ -23,7 +30,7 @@ app = FastAPI(
     description="Real-time scoring API for an imbalanced fraud detection model (LogReg pipeline).",
 )
 
-# Will be loaded on startup
+# Loaded on startup
 model = None
 FEATURES: List[str] = []
 
@@ -43,7 +50,13 @@ class PredictRequest(BaseModel):
     features: Optional[Dict[str, float]] = Field(
         default=None,
         description="Feature mapping by name (keys must match /schema/features)",
-        example={"V1": 0.0, "V2": 0.0, "Time": 0.0, "Amount": 0.0, "Amount_log": 0.0},
+        example={
+            "V1": 0.0,
+            "V2": 0.0,
+            "Time": 0.0,
+            "Amount": 0.0,
+            "Amount_log": 0.0,
+        },
     )
 
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -60,7 +73,7 @@ class PredictResponse(BaseModel):
 # Helpers
 # -----------------------------
 def _safe_float(x: Any) -> float:
-    # Defensive conversion (handles ints, floats, numpy types)
+    """Defensive conversion (handles ints, floats, numpy types)."""
     try:
         xf = float(x)
         if math.isnan(xf) or math.isinf(xf):
@@ -90,9 +103,7 @@ def build_dataframe_from_request(req: PredictRequest) -> pd.DataFrame:
         row = [_safe_float(v) for v in req.vector]
         return pd.DataFrame([row], columns=FEATURES)
 
-    # Named features dict
     feat_map = req.features or {}
-    # Validate keys
     missing = [f for f in FEATURES if f not in feat_map]
     extra = [k for k in feat_map.keys() if k not in FEATURES]
     if missing:
@@ -102,6 +113,53 @@ def build_dataframe_from_request(req: PredictRequest) -> pd.DataFrame:
 
     row = [_safe_float(feat_map[f]) for f in FEATURES]
     return pd.DataFrame([row], columns=FEATURES)
+
+
+def log_request(
+    x_df: pd.DataFrame,
+    threshold: float,
+    proba: float,
+    predicted_label: int,
+) -> None:
+    """
+    Append a single prediction request to monitoring logs.
+
+    - Prefers parquet (single growing table).
+    - Falls back to CSV append if parquet engine isn't available.
+    - Never raises (API must not break on logging).
+    """
+    try:
+        ts = datetime.now(timezone.utc).isoformat()
+        row = {
+            "timestamp_utc": ts,
+            "threshold": float(threshold),
+            "proba_fraud": float(proba),
+            "predicted_label": int(predicted_label),
+        }
+
+        # Add feature columns
+        # x_df has one row, with columns == FEATURES
+        for f in FEATURES:
+            row[f] = float(x_df.iloc[0][f])
+
+        df_row = pd.DataFrame([row])
+
+        # Prefer parquet
+        try:
+            if REQUEST_LOG_PARQUET.exists():
+                df_old = pd.read_parquet(REQUEST_LOG_PARQUET)
+                df_new = pd.concat([df_old, df_row], ignore_index=True)
+            else:
+                df_new = df_row
+            df_new.to_parquet(REQUEST_LOG_PARQUET, index=False)
+        except Exception:
+            # CSV fallback (append mode)
+            header = not REQUEST_LOG_CSV.exists()
+            df_row.to_csv(REQUEST_LOG_CSV, mode="a", header=header, index=False)
+
+    except Exception:
+        # Never break scoring if logging fails
+        return
 
 
 # -----------------------------
@@ -119,7 +177,6 @@ def load_model() -> None:
     # Pull feature order directly from trained pipeline
     names = getattr(model, "feature_names_in_", None)
     if names is None:
-        # Fallback if not available
         n = getattr(model, "n_features_in_", None)
         if n is None:
             raise RuntimeError("Model has no feature_names_in_ or n_features_in_. Cannot determine schema.")
@@ -138,6 +195,8 @@ def health() -> Dict[str, Any]:
         "model_path": str(MODEL_PATH),
         "model_exists": MODEL_PATH.exists(),
         "num_features": len(FEATURES),
+        "request_log_parquet": str(REQUEST_LOG_PARQUET),
+        "request_log_csv": str(REQUEST_LOG_CSV),
     }
 
 
@@ -160,6 +219,9 @@ def predict(req: PredictRequest) -> PredictResponse:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
     label = int(proba >= req.threshold)
+
+    # Monitoring log (does not affect response)
+    log_request(x_df=x_df, threshold=req.threshold, proba=proba, predicted_label=label)
 
     return PredictResponse(
         proba_fraud=proba,

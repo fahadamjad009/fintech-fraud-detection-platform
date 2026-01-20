@@ -22,3 +22,15 @@ __pycache__/
 # --- Artifacts (generated outputs) ---
 /models/
 reports/interactive/
+
+# monitoring runtime logs
+monitoring/data/*.parquet
+monitoring/data/*.csv
+monitoring/data/*.json
+monitoring/reports/*.parquet
+monitoring/reports/*.csv
+monitoring/reports/*.json
+
+# --- Runtime / Monitoring data ---
+monitoring/data/*
+!monitoring/data/.gitkeep
