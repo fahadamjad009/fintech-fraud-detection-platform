@@ -113,6 +113,34 @@ Instead of selecting a threshold purely on metrics, this project **minimises exp
 
 ---
 
+
+## 📡 Monitoring & Drift Detection
+
+This project includes **production-style data drift monitoring**, simulating how fraud systems are monitored after deployment.
+
+### What is monitored?
+- Feature distributions between:
+  - Reference (training) data
+  - Current (simulated incoming) data
+
+### Techniques used
+- **Population Stability Index (PSI)**
+- **Kolmogorov–Smirnov (KS) test**
+
+### Why this matters
+In real financial systems:
+- Fraud patterns change over time
+- Models degrade silently
+- Monitoring is required to trigger retraining or investigation
+
+### Output
+- Drift report (CSV + JSON)
+- Feature-level drift flags
+- Integrated Streamlit monitoring dashboard
+
+⚠️ Drift shown here is **simulated** to demonstrate monitoring logic.
+
+
 ##  Streamlit Dashboard (Proof)
 
 The Streamlit dashboard enables **interactive inspection** of:
