@@ -6,8 +6,11 @@ scores it with the saved XGBoost champion, and computes:
   - Tier 1 (business impact): $-weighted catch rate, fraud $ caught/leaked,
     net financial benefit, loss reduction vs no-model, approval/decline rates.
   - Tier 2 (operations): alert volume, analyst capacity, decile lift table.
-  - Tier 3 (model quality): Brier score, score KS separation.
+  - Tier 3 (model quality): Brier score, score KS separation statistic.
   - Tier 5 (segments): performance by transaction-amount bucket and hour-of-day.
+
+Also emits a 101-point threshold sweep (0.00 -> 1.00) with full business metrics
+at each step so the dashboard slider is live without loading the model on Cloud.
 
 Outputs:
   reports/business_metrics.json
@@ -85,8 +88,8 @@ def metrics_at_threshold(df: pd.DataFrame, threshold: float, cost_fp: float) -> 
         "approval_rate_pct": (total_tx - alert_volume) / total_tx * 100,
         "catch_rate_count": tp / max(tp + fn, 1),
         "catch_rate_dollar": fraud_amt_caught / max(fraud_amt_total, 1e-9),
-        "precision_count": tp / max(tp + fp, 1),
-        "precision_dollar": fraud_amt_caught / max(fraud_amt_alerted, 1e-9),
+        "precision_count": tp / max(tp + fp, 1) if (tp + fp) > 0 else 0.0,
+        "precision_dollar": fraud_amt_caught / max(fraud_amt_alerted, 1e-9) if fraud_amt_alerted > 0 else 0.0,
         "fraud_amount_total": fraud_amt_total,
         "fraud_amount_caught": fraud_amt_caught,
         "fraud_amount_leaked": fraud_amt_leaked,
@@ -94,6 +97,13 @@ def metrics_at_threshold(df: pd.DataFrame, threshold: float, cost_fp: float) -> 
         "net_financial_benefit": net_benefit,
         "loss_reduction_pct": fraud_amt_caught / max(fraud_amt_total, 1e-9) * 100,
     }
+
+
+def threshold_sweep(df: pd.DataFrame, cost_fp: float, n_steps: int = 101) -> list[dict]:
+    """Full sweep from 0.00 -> 1.00 with business metrics at every step.
+    Enables a live dashboard slider that recomputes net benefit instantly."""
+    thresholds = np.linspace(0.0, 1.0, n_steps)
+    return [metrics_at_threshold(df, float(t), cost_fp) for t in thresholds]
 
 
 def decile_lift_table(df: pd.DataFrame) -> list[dict]:
@@ -196,14 +206,12 @@ def main() -> None:
     total_vol = float(df["Amount"].sum())
     print(f"Holdout: {n:,} txns | {n_fraud} fraud | ${fraud_vol:,.0f} fraud volume of ${total_vol:,.0f} total")
 
-    # Model quality
     brier = float(brier_score_loss(df["y_true"], df["score"]))
     ks_stat, ks_p = scstats.ks_2samp(
         df.loc[df["y_true"] == 1, "score"],
         df.loc[df["y_true"] == 0, "score"],
     )
 
-    # Threshold scenarios
     thresholds = {
         "high_recall_0.10": DEFAULTS["high_recall_threshold"],
         "default_0.50": DEFAULTS["default_threshold"],
@@ -213,6 +221,9 @@ def main() -> None:
         name: metrics_at_threshold(df, thr, DEFAULTS["cost_fp_usd"])
         for name, thr in thresholds.items()
     }
+
+    print("Computing 101-point threshold sweep with business metrics...")
+    full_sweep = threshold_sweep(df, DEFAULTS["cost_fp_usd"], n_steps=101)
 
     decile_table = decile_lift_table(df)
     seg_amount = segment_by_amount(df, DEFAULTS["cost_optimum_threshold"])
@@ -236,6 +247,7 @@ def main() -> None:
             "score_ks_p_value": float(ks_p),
         },
         "thresholds": threshold_metrics,
+        "threshold_sweep": full_sweep,
         "decile_lift_table": decile_table,
         "segment_by_amount_at_optimum": seg_amount,
         "segment_by_hour_at_optimum": seg_hour,
@@ -245,7 +257,7 @@ def main() -> None:
     REPORTS_DIR.mkdir(exist_ok=True)
     out_json = REPORTS_DIR / "business_metrics.json"
     out_json.write_text(json.dumps(output, indent=2))
-    print(f"Saved: {out_json}")
+    print(f"Saved: {out_json} ({out_json.stat().st_size:,} bytes)")
 
     pd.DataFrame(decile_table).to_csv(REPORTS_DIR / "decile_lift_table.csv", index=False)
     print(f"Saved: {REPORTS_DIR / 'decile_lift_table.csv'}")
@@ -259,9 +271,7 @@ def main() -> None:
     print(f"Operational cost:      ${cost_opt['operational_cost']:,.0f}")
     print(f"Net benefit:           ${cost_opt['net_financial_benefit']:,.0f}")
 
-    print("\n=== TOP 3 DECILES (concentration of fraud) ===")
-    for r in decile_table[:3]:
-        print(f"Decile {r['decile']}: {r['fraud_count']:>3} fraud / {r['n_transactions']:,} txns | lift={r['lift']:.1f}x | cum. fraud caught={r['cumulative_fraud_count_pct']:.1f}%")
+    print(f"\nThreshold sweep: {len(full_sweep)} points covering 0.00 -> 1.00")
 
 
 if __name__ == "__main__":
