@@ -34,3 +34,7 @@ monitoring/reports/*.json
 # --- Runtime / Monitoring data ---
 monitoring/data/*
 !monitoring/data/.gitkeep
+
+# Whitelist drift reports for the deployed monitoring tab demo
+!monitoring/reports/data_drift_report.csv
+!monitoring/reports/data_drift_report.json
