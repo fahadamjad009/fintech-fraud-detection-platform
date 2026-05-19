@@ -1,0 +1,32 @@
+﻿[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fintech-fraud-detection-platform"
+version = "0.1.0"
+description = "End-to-end fraud detection ML system with cost-based decisioning, drift monitoring, Streamlit dashboard, and FastAPI scoring endpoint."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Fahad Amjad" }]
+keywords = ["fraud-detection", "machine-learning", "fintech", "imbalanced-classification", "xgboost", "streamlit", "fastapi", "mlops"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Intended Audience :: Financial and Insurance Industry",
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[project.urls]
+Repository = "https://github.com/fahadamjad009/fintech-fraud-detection-platform"
+Issues = "https://github.com/fahadamjad009/fintech-fraud-detection-platform/issues"
