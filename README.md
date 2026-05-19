@@ -99,7 +99,7 @@ Production-style drift monitoring with **PSI** (bin-shift magnitude) and **KS** 
 
 ```mermaid
 flowchart LR
-    A[Raw Kaggle CSV<br/>284k transactions] --> B[CSV → Parquet]
+    A[Raw Kaggle CSV<br/>284k transactions] --> B[CSV to Parquet]
     B --> C[Feature engineering<br/>+ Amount_log]
     C --> D[Stratified 80/20<br/>split, seed 42]
     D --> E1[Logistic<br/>Regression<br/>baseline]
@@ -123,6 +123,8 @@ Detailed design notes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · field-l
 ---
 
 ## 📁 Repository structure
+
+```
 fintech-fraud-detection-platform/
 ├── api/
 │   └── app.py                          FastAPI real-time scoring endpoint
@@ -150,11 +152,12 @@ fintech-fraud-detection-platform/
 │   ├── cost_threshold_optimum.json     Cost-based optimal threshold
 │   └── figures/                        PR/ROC/cost/comparison plots + dashboard screenshots
 └── src/
-├── ingestion/                      Kaggle → Parquet pipeline
-├── features/                       Feature engineering (Amount_log)
-├── models/                         Train LR + XGB, cost optimiser, model comparison
-├── analytics/                      ← business_metrics.py (the consulting layer)
-└── validation/                     Schema checks for raw data
+    ├── ingestion/                      Kaggle to Parquet pipeline
+    ├── features/                       Feature engineering (Amount_log)
+    ├── models/                         Train LR + XGB, cost optimiser, model comparison
+    ├── analytics/                      <- business_metrics.py (the consulting layer)
+    └── validation/                     Schema checks for raw data
+```
 
 ---
 
@@ -173,19 +176,19 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # 4) Get the dataset
-#    Download 'creditcard.csv' from Kaggle and place at data/raw/creditcard.csv
+#    Download creditcard.csv from Kaggle and place at data/raw/creditcard.csv
 #    https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
 
 # 5) Run the pipeline (each step is idempotent)
-python src/ingestion/convert_to_parquet.py        # CSV → data/processed/creditcard.parquet
-python src/features/build_features.py             # → data/features/creditcard_features.parquet
-python src/models/train_baseline_logreg.py        # → models/baseline_logreg.joblib
-python src/models/train_xgb.py                    # → models/xgb.joblib
-python src/models/cost_threshold_optimiser.py     # → reports/cost_threshold_optimum.json
-python src/models/make_baseline_plots.py          # → reports/figures/*.png
-python src/models/compare_models.py               # → reports/figures/model_comparison_auc.png
-python monitoring/detect_drift.py                 # → monitoring/reports/data_drift_report.*
-python -m src.analytics.business_metrics          # → reports/business_metrics.json + decile_lift_table.csv
+python src/ingestion/convert_to_parquet.py
+python src/features/build_features.py
+python src/models/train_baseline_logreg.py
+python src/models/train_xgb.py
+python src/models/cost_threshold_optimiser.py
+python src/models/make_baseline_plots.py
+python src/models/compare_models.py
+python monitoring/detect_drift.py
+python -m src.analytics.business_metrics
 
 # 6) Launch the Streamlit dashboard
 streamlit run dashboards/app.py
@@ -226,7 +229,7 @@ uvicorn api.app:app --reload --port 8000
 - By hour-of-day (24-hour profile)
 
 **101-point threshold sweep**
-- Every business metric pre-computed at thresholds 0.00 → 1.00 in 0.01 steps
+- Every business metric pre-computed at thresholds 0.00 to 1.00 in 0.01 steps
 - Enables the dashboard slider to do live recomputation without loading the model on Cloud (read-only against pre-baked JSON)
 
 Outputs: `reports/business_metrics.json` (80 KB), `reports/decile_lift_table.csv`.
